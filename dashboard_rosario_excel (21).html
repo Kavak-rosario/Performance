@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Reservas Rosario</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>if(typeof XLSX==='undefined'){document.write('<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script>')}</script>
+<style>
+:root{
+  --bg:#05102e;--s1:#0a1940;--s2:#0f2050;--border:rgba(255,255,255,0.09);
+  --accent:#00f0c8;--red:#ff3d5a;--yellow:#ffcc00;--purple:#b06bff;
+  --blue:#4db8ff;--green:#00e676;--text:#e0e0f0;--muted:#5a5a78;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 50% at 10% 0%,rgba(0,80,200,0.12) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 90% 100%,rgba(0,240,200,0.05) 0%,transparent 60%);pointer-events:none;z-index:0}
+.wrap{max-width:1440px;margin:0 auto;padding:28px 24px;position:relative;z-index:1}
+
+header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:12px}
+.h-title{font-size:2.2rem;font-weight:800;letter-spacing:-0.01em;line-height:1.1}
+.h-title em{color:var(--accent);font-style:normal}
+.h-sub{font-family:'Inter',sans-serif;font-size:0.76rem;font-weight:500;color:#8ba8d4;margin-top:6px}
+.live-pill{display:inline-flex;align-items:center;gap:6px;background:rgba(0,240,200,0.07);border:1px solid rgba(0,240,200,0.18);color:var(--accent);border-radius:100px;padding:5px 14px;font-family:'Inter',sans-serif;font-weight:700;font-size:0.72rem;margin-top:8px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.6s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.paste-bar{display:flex;align-items:center;gap:10px;margin-bottom:26px;flex-wrap:wrap}
+.paste-label{font-family:'Inter',sans-serif;font-weight:700;font-size:0.72rem;color:var(--accent);white-space:nowrap}
+
+#parseMsg{font-family:'Inter',sans-serif;font-size:0.7rem;color:var(--muted)}
+#parseMsg.ok{color:var(--green)}#parseMsg.err{color:var(--red)}
+
+#xlsxInput{display:none}
+#xlsxBtn{
+  background:transparent;color:#8ba8d4;
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:8px;padding:5px 13px;
+  font-family:'Inter',sans-serif;font-weight:600;font-size:0.72rem;
+  cursor:pointer;white-space:nowrap;
+  transition:all .2s;display:flex;align-items:center;gap:5px;
+}
+#xlsxBtn:hover{color:var(--accent);border-color:rgba(0,240,200,0.3)}
+
+/* ── HISTORIAL ── */
+.hist-mes{background:var(--s1);border:1px solid rgba(255,204,0,0.12);border-radius:14px;padding:20px 24px;margin-bottom:18px}
+.hist-mes-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.hist-mes-title{font-family:'Inter',sans-serif;font-size:1rem;font-weight:800;color:var(--yellow)}
+.hist-mes-sub{font-family:'Inter',sans-serif;font-size:0.68rem;color:var(--muted)}
+.hist-del{background:transparent;border:1px solid rgba(255,255,255,0.08);color:#8ba8d4;border-radius:6px;padding:3px 10px;font-size:0.65rem;cursor:pointer;font-family:'Inter',sans-serif}
+.hist-del:hover{color:var(--red);border-color:rgba(255,80,80,0.3)}
+.hist-table{width:100%;border-collapse:collapse;font-family:'Inter',sans-serif;font-size:0.75rem}
+.hist-table th{color:#8ba8d4;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:0.62rem;padding:6px 10px;border-bottom:1px solid var(--border);text-align:left}
+.hist-table td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text)}
+.hist-table tr:last-child td{border-bottom:none}
+.hist-table tr:hover td{background:rgba(255,255,255,0.02)}
+.hist-pct{font-weight:700}
+.hist-ok{color:var(--green)}.hist-warn{color:var(--yellow)}.hist-bad{color:var(--red)}
+.hist-team-bar{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;padding:12px 16px;background:var(--s2);border-radius:10px}
+.hist-kpi{display:flex;flex-direction:column;align-items:center;gap:2px}
+.hist-kpi-val{font-family:'Inter',sans-serif;font-size:1.1rem;font-weight:800}
+.hist-kpi-lbl{font-family:'Inter',sans-serif;font-size:0.65rem;color:var(--muted);letter-spacing:0}
+.hist-empty{text-align:center;color:var(--muted);font-family:'Inter',sans-serif;font-size:0.8rem;padding:32px 0}
+
+
+#metaToggle{
+  background:transparent;color:#8ba8d4;
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:8px;padding:5px 13px;
+  font-family:'Inter',sans-serif;font-weight:600;font-size:0.72rem;
+  cursor:pointer;white-space:nowrap;transition:all .2s;
+  display:inline-flex;align-items:center;gap:5px;
+}
+#metaToggle:hover{color:var(--yellow);border-color:rgba(255,204,0,0.3)}
+.meta-panel{
+  background:var(--s1);border:1px solid rgba(255,204,0,0.15);
+  border-radius:14px;padding:20px 24px;margin-bottom:24px;display:none;
+}
+.meta-panel.open{display:block}
+.meta-panel-title{font-family:'Inter',sans-serif;font-size:0.72rem;font-weight:800;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--yellow);margin-bottom:4px}
+.meta-section{font-family:'Inter',sans-serif;font-size:0.67rem;color:#8ba8d4;
+  text-transform:uppercase;letter-spacing:.08em;margin:14px 0 8px}
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:14px}
+.meta-field{display:flex;flex-direction:column;gap:4px}
+.meta-field label{font-family:'Inter',sans-serif;font-size:0.65rem;font-weight:700;
+  color:#8ba8d4;text-transform:uppercase;letter-spacing:.06em}
+.meta-field input{background:var(--s2);border:1px solid rgba(255,255,255,0.08);
+  border-radius:6px;color:var(--text);font-family:'Inter',sans-serif;
+  font-size:0.82rem;font-weight:700;padding:6px 10px;outline:none;
+  transition:border-color .2s;width:100%}
+.meta-field input:focus{border-color:var(--yellow)}
+.meta-save{background:var(--yellow);color:#000;border:none;border-radius:8px;
+  padding:7px 18px;font-family:'Inter',sans-serif;font-weight:800;font-size:0.75rem;
+  cursor:pointer;transition:opacity .2s}
+.meta-save:hover{opacity:.85}
+
+
+.sec{font-family:'Inter',sans-serif;font-size:1rem;font-weight:800;letter-spacing:0;color:#7ab3ff;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.sec::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+.kpi-row2{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+@media(max-width:900px){.kpi-row,.kpi-row2{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:20px 22px;position:relative;overflow:hidden;animation:fadeUp .5s ease both}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0}
+.kpi.c1::after{background:var(--accent)}.kpi.c2::after{background:var(--yellow)}.kpi.c3::after{background:var(--red)}.kpi.c4::after{background:var(--purple)}.kpi.c5::after{background:var(--blue)}
+.kpi-lbl{font-family:'Inter',sans-serif;font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#8ba8d4;margin-bottom:8px}
+.kpi-num{font-size:2rem;font-weight:800;letter-spacing:-0.02em;line-height:1;font-family:'Inter',sans-serif}
+.kpi.c1 .kpi-num{color:var(--accent)}.kpi.c2 .kpi-num{color:var(--yellow)}.kpi.c3 .kpi-num{color:var(--red)}.kpi.c4 .kpi-num{color:var(--purple)}.kpi.c5 .kpi-num{color:var(--blue)}
+.kpi-note{font-family:'Inter',sans-serif;font-size:0.7rem;color:var(--muted);margin-top:5px}
+.tok{color:var(--green)}.twarn{color:var(--yellow)}.tbad{color:var(--red)}
+
+.gauge-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+@media(max-width:640px){.gauge-row{grid-template-columns:1fr}}
+.gauge-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:24px;display:flex;flex-direction:column;align-items:center}
+.gauge-ttl{font-family:'Inter',sans-serif;font-size:0.78rem;font-weight:700;letter-spacing:0;color:#8ba8d4;margin-bottom:14px;text-align:center}
+.arc-bg{stroke:rgba(255,255,255,0.05);stroke-width:16;fill:none}
+.arc-fill{stroke-width:16;fill:none;stroke-linecap:round;transition:stroke-dasharray 1.2s cubic-bezier(.4,0,.2,1)}
+.arc-val{font-family:'Inter',sans-serif;font-size:1.6rem;font-weight:800;dominant-baseline:middle;text-anchor:middle}
+.arc-sub{font-family:'Inter',sans-serif;font-size:0.6rem;dominant-baseline:middle;text-anchor:middle;fill:var(--muted)}
+.gauge-meta{font-family:'Inter',sans-serif;font-size:0.72rem;font-weight:500;color:var(--muted);margin-top:10px;text-align:center}
+.gauge-meta span{color:var(--accent)}
+
+.table-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:24px}
+.t-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-family:'Inter',sans-serif;font-size:0.72rem;font-weight:700;letter-spacing:0;color:#8ba8d4;padding:10px 14px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+td{padding:9px 14px;font-size:0.82rem;font-family:'Inter',sans-serif;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.018)}
+.agent-cell{display:flex;align-items:center;gap:8px;font-weight:700;font-family:'Inter',sans-serif;font-size:0.85rem}
+.tier{font-family:'Inter',sans-serif;font-size:0.6rem;font-weight:800;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.tier-top{background:rgba(0,240,200,0.12);color:var(--accent)}.tier-mid{background:rgba(255,204,0,0.1);color:var(--yellow)}.tier-low{background:rgba(255,61,90,0.12);color:var(--red)}
+.pbar-wrap{background:rgba(255,255,255,0.06);border-radius:100px;height:4px;min-width:70px;overflow:hidden}
+.pbar{height:100%;border-radius:100px;transition:width 1s cubic-bezier(.4,0,.2,1)}
+.mono{font-family:'Inter',sans-serif;font-size:0.8rem;font-weight:600}
+
+.stages-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:22px 24px;margin-bottom:24px}
+.stage-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.stage-row:last-child{margin-bottom:0}
+.stage-name{font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:600;color:#8ba8d4;min-width:160px}
+.stage-bar-wrap{flex:1;background:rgba(255,255,255,0.05);border-radius:100px;height:8px;overflow:hidden}
+.stage-bar{height:100%;border-radius:100px;transition:width 1s cubic-bezier(.4,0,.2,1)}
+.stage-count{font-family:'Inter',sans-serif;font-size:0.75rem;font-weight:600;color:var(--text);min-width:30px;text-align:right}
+
+.actions-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:24px}
+.act-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:20px 22px}
+.act-card.top-tier{border-color:rgba(0,240,200,0.2)}.act-card.low-tier{border-color:rgba(255,61,90,0.2)}
+.act-agent{font-size:1rem;font-weight:800;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.act-status{font-family:'Inter',sans-serif;font-size:0.7rem;color:var(--muted);margin-bottom:10px}
+.act-list{list-style:none;display:flex;flex-direction:column;gap:7px}
+.act-list li{font-size:0.8rem;font-family:'Inter',sans-serif;color:#c0c0d8;line-height:1.4;display:flex;align-items:flex-start;gap:8px}
+.act-list li .ico{flex-shrink:0;color:var(--accent);font-family:'Space Mono',monospace;margin-top:1px}
+.act-list li.warn .ico{color:var(--yellow)}.act-list li.danger .ico{color:var(--red)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── TEAM GOAL TRACKER ── */
+.goal-banner{
+  background:var(--s1);border:1px solid rgba(0,240,200,0.2);
+  border-radius:16px;padding:28px 32px;margin-bottom:24px;
+  position:relative;overflow:hidden;
+}
+.goal-banner::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(0,240,200,0.04) 0%,transparent 60%);
+  pointer-events:none;
+}
+.goal-banner-top{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;margin-bottom:24px;
+}
+.goal-banner-title{
+  font-family:'Inter',sans-serif;font-size:1.2rem;font-weight:900;
+  letter-spacing:0;color:var(--accent);
+}
+.goal-banner-sub{
+  font-family:'Inter',sans-serif;font-size:0.78rem;font-weight:500;
+  color:#8ba8d4;
+}
+.goal-pct-big{
+  font-family:'Inter',sans-serif;font-size:1.8rem;font-weight:800;
+  letter-spacing:-0.02em;
+}
+.goal-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:20px;}
+@media(max-width:900px){.goal-grid{grid-template-columns:repeat(2,1fr)}}
+.goal-item{}
+.goal-item-label{
+  font-family:'Inter',sans-serif;font-size:0.72rem;font-weight:700;
+  letter-spacing:0;color:#8ba8d4;
+  margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;
+}
+.goal-item-nums{
+  font-family:'Inter',sans-serif;font-size:0.82rem;font-weight:700;
+  margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline;
+}
+.goal-actual{font-size:1.3rem;font-weight:800;letter-spacing:-0.01em;font-family:'Inter',sans-serif}
+.goal-target{font-size:0.82rem;color:#8ba8d4;}
+.goal-track{background:rgba(255,255,255,0.06);border-radius:100px;height:10px;overflow:hidden;position:relative;}
+.goal-fill{height:100%;border-radius:100px;transition:width 1.2s cubic-bezier(.4,0,.2,1);position:relative;}
+.goal-fill::after{
+  content:'';position:absolute;top:0;right:0;bottom:0;width:3px;
+  background:rgba(255,255,255,0.4);border-radius:0 100px 100px 0;
+}
+.goal-meta-line{
+  font-family:'Inter',sans-serif;font-size:0.7rem;font-weight:600;
+  color:#8ba8d4;margin-top:6px;display:flex;justify-content:space-between;
+}
+.goal-gap-ok{color:var(--green)}.goal-gap-warn{color:var(--yellow)}.goal-gap-bad{color:var(--red)}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <div class="h-title">Reservas <em>Rosario</em></div>
+    <div class="h-sub">MTD · Hub WH-000139 · 21 Abril 2026 · KUNA = FA con número asignado</div>
+    <div class="live-pill"><span class="live-dot"></span>LIVE — pega datos nuevos para refrescar</div>
+  </div>
+</header>
+
+<div class="paste-bar">
+  <input type="file" id="xlsxInput" accept=".xlsx,.xls">
+  <button id="xlsxBtn" onclick="document.getElementById('xlsxInput').click()">↑ Cargar Excel</button>
+  <button id="metaToggle" onclick="document.querySelector('.meta-panel').classList.toggle('open')">⚙ Editar Metas</button>
+  <div id="parseMsg"></div>
+</div>
+
+<div class="meta-panel">
+  <div class="meta-panel-title">⚙ Configuración de Metas</div>
+  <div class="meta-section">Equipo (STR / KUNA / Cash / Fin %)</div>
+  <div class="meta-grid">
+    <div class="meta-field"><label>Total Reservas</label><input id="m-reservas" type="number" value="240"></div>
+    <div class="meta-field"><label>STR Total %</label><input id="m-str" type="number" value="70"></div>
+    <div class="meta-field"><label>KUNA %</label><input id="m-kuna" type="number" value="58"></div>
+    <div class="meta-field"><label>STR Cash %</label><input id="m-cash" type="number" value="80"></div>
+    <div class="meta-field"><label>STR Financiamiento %</label><input id="m-fin" type="number" value="66"></div>
+  </div>
+  <div class="meta-section">Meta individual de reservas por asesor</div>
+  <div class="meta-grid">
+    <div class="meta-field"><label>Oscar</label><input id="ma-Oscar Longines" type="number" value="37"></div>
+    <div class="meta-field"><label>Paola</label><input id="ma-Paola Hernandez" type="number" value="37"></div>
+    <div class="meta-field"><label>Brandon</label><input id="ma-Brandon Jarquin" type="number" value="37"></div>
+    <div class="meta-field"><label>Francisco</label><input id="ma-Franciso Ramirez Gonzalez" type="number" value="37"></div>
+    <div class="meta-field"><label>Gabriela</label><input id="ma-Gaby Sánchez" type="number" value="37"></div>
+    <div class="meta-field"><label>Yahir</label><input id="ma-YAHIR LUIZ" type="number" value="18"></div>
+    <div class="meta-field"><label>Samuel</label><input id="ma-Samuel Rodriguez" type="number" value="18"></div>
+    <div class="meta-field"><label>Mario</label><input id="ma-Mario Alberto Contreras" type="number" value="15"></div>
+    <div class="meta-field"><label>Mirza</label><input id="ma-Mirza Guevara" type="number" value="15"></div>
+  </div>
+  <button class="meta-save" onclick="applyMetas()">✓ Aplicar Metas</button>
+</div>
+
+<div class="sec">🎯 Alcance de Meta Mensual — Hub Rosario</div>
+<div class="goal-banner">
+  <div class="goal-banner-top">
+    <div>
+      <div class="goal-banner-title">Progreso del Equipo</div>
+      <div class="goal-banner-sub">Metas definidas · MTD Abril 2026 · Se actualiza con los datos</div>
+    </div>
+    <div style="text-align:right">
+      <div class="goal-banner-sub">Avance general</div>
+      <div class="goal-pct-big" id="g-overall-pct" style="color:var(--accent)">—</div>
+    </div>
+  </div>
+  <div class="goal-grid">
+    <!-- RESERVAS -->
+    <div class="goal-item">
+      <div class="goal-item-label"><span>📋 Reservas</span><span id="g-res-badge"></span></div>
+      <div class="goal-item-nums">
+        <span class="goal-actual" id="g-res-actual" style="color:var(--accent)">—</span>
+        <span class="goal-target">/ <span id="lbl-res-meta">240</span></span>
+      </div>
+      <div class="goal-track"><div class="goal-fill" id="g-res-fill2" style="background:var(--accent);width:0%"></div></div>
+      <div class="goal-meta-line"><span id="g-res-pct2">—</span><span id="g-res-gap"></span></div>
+    </div>
+    <!-- STR TOTAL -->
+    <div class="goal-item">
+      <div class="goal-item-label"><span>⚡ STR Total</span><span id="g-str-badge"></span></div>
+      <div class="goal-item-nums">
+        <span class="goal-actual" id="g-str-actual" style="color:var(--yellow)">—</span>
+        <span class="goal-target">/ <span id="lbl-str-meta">70</span>%</span>
+      </div>
+      <div class="goal-track"><div class="goal-fill" id="g-str-fill2" style="background:var(--yellow);width:0%"></div></div>
+      <div class="goal-meta-line"><span id="g-str-pct2">—</span><span id="g-str-gap2"></span></div>
+    </div>
+    <!-- KUNA -->
+    <div class="goal-item">
+      <div class="goal-item-label"><span>🔷 KUNA</span><span id="g-kuna-badge"></span></div>
+      <div class="goal-item-nums">
+        <span class="goal-actual" id="g-kuna-actual" style="color:var(--purple)">—</span>
+        <span class="goal-target">/ <span id="lbl-kuna-meta">58</span>%</span>
+      </div>
+      <div class="goal-track"><div class="goal-fill" id="g-kuna-fill2" style="background:var(--purple);width:0%"></div></div>
+      <div class="goal-meta-line"><span id="g-kuna-pct2">—</span><span id="g-kuna-gap2"></span></div>
+    </div>
+    <!-- CASH -->
+    <div class="goal-item">
+      <div class="goal-item-label"><span>💵 Cash</span><span id="g-cash-badge"></span></div>
+      <div class="goal-item-nums">
+        <span class="goal-actual" id="g-cash-actual" style="color:var(--blue)">—</span>
+        <span class="goal-target">/ <span id="lbl-cash-meta">80</span>%</span>
+      </div>
+      <div class="goal-track"><div class="goal-fill" id="g-cash-fill2" style="background:var(--blue);width:0%"></div></div>
+      <div class="goal-meta-line"><span id="g-cash-pct2">—</span><span id="g-cash-gap2"></span></div>
+    </div>
+    <!-- FIN -->
+    <div class="goal-item">
+      <div class="goal-item-label"><span>🏦 Financiamiento</span><span id="g-fin-badge"></span></div>
+      <div class="goal-item-nums">
+        <span class="goal-actual" id="g-fin-actual" style="color:var(--green)">—</span>
+        <span class="goal-target">/ <span id="lbl-fin-meta">66</span>%</span>
+      </div>
+      <div class="goal-track"><div class="goal-fill" id="g-fin-fill2" style="background:var(--green);width:0%"></div></div>
+      <div class="goal-meta-line"><span id="g-fin-pct2">—</span><span id="g-fin-gap2"></span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">Métricas globales</div>
+<div class="kpi-row">
+  <div class="kpi c1"><div class="kpi-lbl">Reservas Totales</div><div class="kpi-num" id="k-total">—</div><div class="kpi-note" id="k-total-n"></div></div>
+  <div class="kpi c4"><div class="kpi-lbl">Ganadas KUNA (FA#)</div><div class="kpi-num" id="k-kw">—</div><div class="kpi-note" id="k-kw-n"></div></div>
+  <div class="kpi c5"><div class="kpi-lbl">Ganadas Cash</div><div class="kpi-num" id="k-cashw">—</div><div class="kpi-note" id="k-cashw-n"></div></div>
+  <div class="kpi c3"><div class="kpi-lbl">Cerradas Perdidas</div><div class="kpi-num" id="k-lost">—</div><div class="kpi-note" id="k-lost-n"></div></div>
+</div>
+<div class="kpi-row2">
+  <div class="kpi c2"><div class="kpi-lbl">STR Total (meta <span id="lbl-kpi-str">70</span>%)</div><div class="kpi-num" id="k-str">—</div><div class="kpi-note" id="k-str-n"></div></div>
+  <div class="kpi c4"><div class="kpi-lbl">% Ganadas KUNA</div><div class="kpi-num" id="k-kstr">—</div><div class="kpi-note" id="k-kstr-n"></div></div>
+  <div class="kpi c5"><div class="kpi-lbl">% Ganadas Cash</div><div class="kpi-num" id="k-cstr">—</div><div class="kpi-note" id="k-cstr-n"></div></div>
+  <div class="kpi c1"><div class="kpi-lbl">Reservas KUNA (FA#)</div><div class="kpi-num" id="k-kuna">—</div><div class="kpi-note" id="k-kuna-n"></div></div>
+</div>
+<div class="kpi-row2" style="grid-template-columns:1fr 1fr 1fr;max-width:900px">
+  <div class="kpi c2"><div class="kpi-lbl">STR Financiamiento</div><div class="kpi-num" id="k-fstr">—</div><div class="kpi-note" id="k-fstr-n"></div></div>
+  <div class="kpi c1"><div class="kpi-lbl">Ganadas Financiamiento</div><div class="kpi-num" id="k-finw">—</div><div class="kpi-note" id="k-finw-n"></div></div>
+  <div class="kpi c3"><div class="kpi-lbl">Perdidas Financiamiento</div><div class="kpi-num" id="k-finl">—</div><div class="kpi-note" id="k-finl-n"></div></div>
+</div>
+
+<div class="sec">Conversión vs Meta</div>
+<div class="gauge-row" style="grid-template-columns:repeat(4,1fr)">
+  <div class="gauge-card">
+    <div class="gauge-ttl">STR Total — Meta <span id="lbl-gauge-str">70</span>%</div>
+    <svg width="200" height="112" viewBox="0 0 200 112" style="overflow:visible">
+      <path class="arc-bg" d="M20,110 A80,80 0 0,1 180,110"/>
+      <path id="g-str-fill" class="arc-fill" d="M20,110 A80,80 0 0,1 180,110" stroke="var(--yellow)" stroke-dasharray="0 251"/>
+      <text id="g-str-val" class="arc-val" x="100" y="90" fill="var(--yellow)">—</text>
+      <text x="100" y="107" class="arc-sub">Ganadas ÷ Cerradas totales</text>
+    </svg>
+    <div class="gauge-meta">Meta: <span id="lbl-gauge-str2">70</span>% &nbsp;|&nbsp; <span id="g-str-gap">—</span></div>
+  </div>
+  <div class="gauge-card">
+    <div class="gauge-ttl">STR KUNA — Meta <span id="lbl-gauge-kuna">58</span>%</div>
+    <svg width="200" height="112" viewBox="0 0 200 112" style="overflow:visible">
+      <path class="arc-bg" d="M20,110 A80,80 0 0,1 180,110"/>
+      <path id="g-kuna-fill" class="arc-fill" d="M20,110 A80,80 0 0,1 180,110" stroke="var(--purple)" stroke-dasharray="0 251"/>
+      <text id="g-kuna-val" class="arc-val" x="100" y="90" fill="var(--purple)">—</text>
+      <text x="100" y="107" class="arc-sub">KUNA Ganadas ÷ Total Ganadas</text>
+    </svg>
+    <div class="gauge-meta">Mix: KUNA sobre ganadas &nbsp;|&nbsp; <span id="g-kuna-gap">—</span></div>
+  </div>
+  <div class="gauge-card">
+    <div class="gauge-ttl">% Ganadas Cash — Meta <span id="lbl-gauge-cash">70</span>%</div>
+    <svg width="200" height="112" viewBox="0 0 200 112" style="overflow:visible">
+      <path class="arc-bg" d="M20,110 A80,80 0 0,1 180,110"/>
+      <path id="g-cash-fill" class="arc-fill" d="M20,110 A80,80 0 0,1 180,110" stroke="var(--blue)" stroke-dasharray="0 251"/>
+      <text id="g-cash-val" class="arc-val" x="100" y="90" fill="var(--blue)">—</text>
+      <text x="100" y="107" class="arc-sub">Contado Ganadas ÷ Contado Cerradas</text>
+    </svg>
+    <div class="gauge-meta">Mix: Cash sobre ganadas &nbsp;|&nbsp; <span id="g-cash-gap">—</span></div>
+  </div>
+  <div class="gauge-card">
+    <div class="gauge-ttl">STR Financiamiento</div>
+    <svg width="200" height="112" viewBox="0 0 200 112" style="overflow:visible">
+      <path class="arc-bg" d="M20,110 A80,80 0 0,1 180,110"/>
+      <path id="g-fin-fill" class="arc-fill" d="M20,110 A80,80 0 0,1 180,110" stroke="var(--yellow)" stroke-dasharray="0 251"/>
+      <text id="g-fin-val" class="arc-val" x="100" y="90" fill="var(--yellow)">—</text>
+      <text x="100" y="107" class="arc-sub">Fin. Ganadas ÷ Fin. Cerradas</text>
+    </svg>
+    <div class="gauge-meta">Meta: <span id="lbl-gauge-fin">70</span>% &nbsp;|&nbsp; <span id="g-fin-gap">—</span></div>
+  </div>
+</div>
+
+<div class="sec">Embudo por etapa</div>
+<div class="stages-card" id="stages-card"></div>
+
+<div class="sec">Performance individual</div>
+<div class="table-card"><div class="t-scroll">
+<table>
+  <thead><tr>
+    <th>Agente</th><th>Total</th><th>Meta</th><th>Avance</th><th>Faltan</th>
+    <th style="color:var(--purple)">KUNA</th><th style="color:var(--accent)">Gan. KUNA</th><th style="color:var(--blue)">Gan. Cash</th><th style="color:var(--red)">Perdidas</th>
+    <th style="color:var(--accent)">STR Total</th><th style="color:var(--purple)">STR KUNA</th><th style="color:var(--blue)">STR Cash</th><th style="color:var(--yellow)">STR Fin.</th><th>Nivel</th>
+  </tr></thead>
+  <tbody id="perf-body"></tbody>
+</table>
+</div></div>
+
+<div class="sec" style="align-items:center">
+  Análisis y plan de acción
+  <button id="feedbackBtn" onclick="generarFeedback()" style="margin-left:10px;background:rgba(0,240,200,0.08);color:var(--accent);border:1px solid rgba(0,240,200,0.25);border-radius:8px;padding:4px 14px;font-family:'Inter',sans-serif;font-weight:700;font-size:0.68rem;cursor:pointer;transition:all .2s;white-space:nowrap">✦ Actualizar Feedback con IA</button>
+</div>
+<div id="feedback-status" style="font-family:'Inter',sans-serif;font-size:0.72rem;color:var(--muted);margin-bottom:12px;min-height:18px"></div>
+<div class="actions-grid" id="actions-grid"></div>
+
+<!-- ── HISTORIAL DE CIERRES ── -->
+<div class="sec" style="align-items:center;margin-top:32px">
+  📅 Historial de Cierres por Mes
+  <button onclick="guardarMes()" style="margin-left:10px;background:rgba(255,204,0,0.1);color:var(--yellow);border:1px solid rgba(255,204,0,0.3);border-radius:8px;padding:4px 14px;font-family:'Inter',sans-serif;font-weight:700;font-size:0.68rem;cursor:pointer;transition:all .2s;white-space:nowrap">💾 Guardar Mes</button>
+  <button onclick="limpiarHistorial()" style="margin-left:6px;background:transparent;color:#8ba8d4;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:4px 10px;font-family:'Inter',sans-serif;font-weight:600;font-size:0.65rem;cursor:pointer;white-space:nowrap">Limpiar historial</button>
+</div>
+<div id="hist-status" style="font-family:'Inter',sans-serif;font-size:0.72rem;color:var(--muted);margin-bottom:12px;min-height:18px"></div>
+<div id="historial-container"></div>
+
+
+  Dashboard Kavak · Hub Rosario WH-000139 · <span style="color:var(--accent)">MTD Abril 2026</span>
+</div>
+</div>
+
+<script>
+const EMBEDDED=[{"agente":"Gaby S\u00e1nchez","stock_id":"495134","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Hand Off - Dictamen","is_kuna":false},{"agente":"Oscar Longines","stock_id":"502015","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Hand Off - Dictamen","is_kuna":false},{"agente":"Oscar Longines","stock_id":"500308","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Hand Off - Dictamen","is_kuna":false},{"agente":"Ivan Covarrubias","stock_id":"464311","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Hand Off - Dictamen","is_kuna":false},{"agente":"Franciso Ramirez Gonzalez","stock_id":"489355","metodo_pago":"Financiamiento","fa_id":"FA222507","stage":"Hand Off - Dictamen","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"500505","metodo_pago":"Financiamiento","fa_id":"FA222111","stage":"Hand Off - Dictamen","is_kuna":true},{"agente":"Aremi Emer","stock_id":"492819","metodo_pago":"Financiamiento","fa_id":"FA222133","stage":"Hand Off - Dictamen","is_kuna":true},{"agente":"Mario Alberto Contreras","stock_id":"498239","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Hand Off - Dictamen","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"495904","metodo_pago":"Financiamiento","fa_id":"FA222337","stage":"Hand Off - Dictamen","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"500750","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Hand Off - Dictamen","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"500491","metodo_pago":"Pago de Contado","fa_id":"FA221624","stage":"Hand Off - Dictamen","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"490828","metodo_pago":"Financiamiento","fa_id":"FA220490","stage":"Hand Off - Dictamen","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"487831","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Hand Off - Dictamen","is_kuna":false},{"agente":"Brandon Jarquin","stock_id":"483471","metodo_pago":"Financiamiento","fa_id":"FA222230","stage":"Hand Off - Dictamen","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"484005","metodo_pago":"Financiamiento","fa_id":"FA220459","stage":"Hand Off - Dictamen","is_kuna":true},{"agente":"YAHIR LUIZ","stock_id":"485623","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Hand Off - Dictamen","is_kuna":false},{"agente":"YAHIR LUIZ","stock_id":"500564","metodo_pago":"Financiamiento","fa_id":"FA222579","stage":"Hand Off - Dictamen","is_kuna":true},{"agente":"YAHIR LUIZ","stock_id":"490808","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Hand Off - Dictamen","is_kuna":false},{"agente":"Gaby S\u00e1nchez","stock_id":"494637","metodo_pago":"Financiamiento","fa_id":"FA220266","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Gaby S\u00e1nchez","stock_id":"494420","metodo_pago":"Financiamiento","fa_id":"FA219047","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Gaby S\u00e1nchez","stock_id":"470955","metodo_pago":"Financiamiento","fa_id":"FA218792","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Gaby S\u00e1nchez","stock_id":"494489","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Gaby S\u00e1nchez","stock_id":"486719","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Gaby S\u00e1nchez","stock_id":"489185","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Gaby S\u00e1nchez","stock_id":"490762","metodo_pago":"Financiamiento","fa_id":"FA217189","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Gaby S\u00e1nchez","stock_id":"490792","metodo_pago":"Financiamiento","fa_id":"FA217570","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Oscar Longines","stock_id":"485710","metodo_pago":"Financiamiento","fa_id":"FA220871","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Oscar Longines","stock_id":"481036","metodo_pago":"Financiamiento","fa_id":"FA220660","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Oscar Longines","stock_id":"485154","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Oscar Longines","stock_id":"487295","metodo_pago":"Financiamiento","fa_id":"FA218765","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Oscar Longines","stock_id":"484883","metodo_pago":"Financiamiento","fa_id":"FA218458","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Oscar Longines","stock_id":"480852","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Oscar Longines","stock_id":"483116","metodo_pago":"Financiamiento","fa_id":"FA217842","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Oscar Longines","stock_id":"494405","metodo_pago":"Financiamiento","fa_id":"FA217486","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Oscar Longines","stock_id":"493913","metodo_pago":"Financiamiento","fa_id":"FA217552","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Samuel Rodriguez","stock_id":"495895","metodo_pago":"Financiamiento","fa_id":"FA220614","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Samuel Rodriguez","stock_id":"479680","metodo_pago":"Financiamiento","fa_id":"FA217401","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Ivan Covarrubias","stock_id":"483938","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Ivan Covarrubias","stock_id":"486743","metodo_pago":"Financiamiento","fa_id":"FA219803","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"497280","metodo_pago":"Financiamiento","fa_id":"FA221370","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"484295","metodo_pago":"Financiamiento","fa_id":"FA220664","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"499059","metodo_pago":"Financiamiento","fa_id":"FA219931","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"496599","metodo_pago":"Financiamiento","fa_id":"FA220209","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"500307","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Franciso Ramirez Gonzalez","stock_id":"490158","metodo_pago":"Financiamiento","fa_id":"FA218228","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Aremi Emer","stock_id":"490731","metodo_pago":"Financiamiento","fa_id":"FA220344","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Mario Alberto Contreras","stock_id":"497111","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"495182","metodo_pago":"Financiamiento","fa_id":"FA219976","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"475440","metodo_pago":"Financiamiento","fa_id":"FA219863","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"497432","metodo_pago":"Financiamiento","fa_id":"FA219367","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"497546","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"496569","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"492462","metodo_pago":"Financiamiento","fa_id":"FA219204","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"496640","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"492896","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"494731","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"484077","metodo_pago":"Financiamiento","fa_id":"FA218403","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"495627","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"496085","metodo_pago":"Financiamiento","fa_id":"FA217391","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"493192","metodo_pago":"Financiamiento","fa_id":"FA217431","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"496915","metodo_pago":"Financiamiento","fa_id":"FA218046","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"496093","metodo_pago":"Financiamiento","fa_id":"FA221570","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"493575","metodo_pago":"Financiamiento","fa_id":"FA221131","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"497269","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Brandon Jarquin","stock_id":"498227","metodo_pago":"Financiamiento","fa_id":"FA219469","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"473042","metodo_pago":"Financiamiento","fa_id":"FA219337","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"474641","metodo_pago":"Financiamiento","fa_id":"FA217785","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"486633","metodo_pago":"Financiamiento","fa_id":"FA217727","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"490169","metodo_pago":"Financiamiento","fa_id":"FA217480","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"496736","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"Brandon Jarquin","stock_id":"475578","metodo_pago":"Financiamiento","fa_id":"FA217395","stage":"Cerrada Ganada","is_kuna":true},{"agente":"YAHIR LUIZ","stock_id":"497755","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Ganada","is_kuna":false},{"agente":"YAHIR LUIZ","stock_id":"499029","metodo_pago":"Financiamiento","fa_id":"FA220079","stage":"Cerrada Ganada","is_kuna":true},{"agente":"Gaby S\u00e1nchez","stock_id":"494489","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Gaby S\u00e1nchez","stock_id":"491219","metodo_pago":"Financiamiento","fa_id":"FA217535","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Mirza Guevara","stock_id":"495441","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Mirza Guevara","stock_id":"499958","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Mirza Guevara","stock_id":"482099","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Oscar Longines","stock_id":"498211","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Oscar Longines","stock_id":"498380","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Oscar Longines","stock_id":"445505","metodo_pago":"Financiamiento","fa_id":"FA218212","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Oscar Longines","stock_id":"487831","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Samuel Rodriguez","stock_id":"489815","metodo_pago":"Financiamiento","fa_id":"FA222157","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Samuel Rodriguez","stock_id":"485271","metodo_pago":"Financiamiento","fa_id":"FA220553","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Samuel Rodriguez","stock_id":"495895","metodo_pago":"Financiamiento","fa_id":"FA219575","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Samuel Rodriguez","stock_id":"496581","metodo_pago":"Financiamiento","fa_id":"FA219218","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Ivan Covarrubias","stock_id":"484258","metodo_pago":"Financiamiento","fa_id":"FA219564","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"498976","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Franciso Ramirez Gonzalez","stock_id":"489355","metodo_pago":"Financiamiento","fa_id":"FA221729","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"466911","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Franciso Ramirez Gonzalez","stock_id":"494406","metodo_pago":"Financiamiento","fa_id":"FA217223","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"494406","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Mario Alberto Contreras","stock_id":"502783","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"498227","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Brandon Jarquin","stock_id":"499150","metodo_pago":"Financiamiento","fa_id":"FA221327","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"499341","metodo_pago":"Financiamiento","fa_id":"FA219922","stage":"Cerrada Perdida","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"496974","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Brandon Jarquin","stock_id":"490169","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"YAHIR LUIZ","stock_id":"499029","metodo_pago":"Financiamiento","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"YAHIR LUIZ","stock_id":"493220","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Cerrada Perdida","is_kuna":false},{"agente":"Oscar Longines","stock_id":"489216","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Pago","is_kuna":false},{"agente":"Mirza Guevara","stock_id":"499784","metodo_pago":"Financiamiento","fa_id":"FA219104","stage":"Facturaci\u00f3n","is_kuna":true},{"agente":"Oscar Longines","stock_id":"502661","metodo_pago":"Financiamiento","fa_id":"FA221527","stage":"Facturaci\u00f3n","is_kuna":true},{"agente":"Oscar Longines","stock_id":"499335","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Facturaci\u00f3n","is_kuna":false},{"agente":"Oscar Longines","stock_id":"495169","metodo_pago":"Financiamiento","fa_id":"FA221102","stage":"Facturaci\u00f3n","is_kuna":true},{"agente":"Oscar Longines","stock_id":"488167","metodo_pago":"Financiamiento","fa_id":"FA219444","stage":"Facturaci\u00f3n","is_kuna":true},{"agente":"Jose Luis Ventura","stock_id":"499670","metodo_pago":"Financiamiento","fa_id":"FA219598","stage":"Facturaci\u00f3n","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"488235","metodo_pago":"Financiamiento","fa_id":"FA222573","stage":"Facturaci\u00f3n","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"500854","metodo_pago":"Financiamiento","fa_id":"FA221842","stage":"Facturaci\u00f3n","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"495899","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Facturaci\u00f3n","is_kuna":false},{"agente":"Mario Alberto Contreras","stock_id":"498732","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Facturaci\u00f3n","is_kuna":false},{"agente":"Paola Hernandez","stock_id":"500524","metodo_pago":"Financiamiento","fa_id":"FA221629","stage":"Facturaci\u00f3n","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"499884","metodo_pago":"Financiamiento","fa_id":"FA222264","stage":"Facturaci\u00f3n","is_kuna":true},{"agente":"YAHIR LUIZ","stock_id":"490177","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Facturaci\u00f3n","is_kuna":false},{"agente":"Jose Luis Ventura","stock_id":"497704","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Firma de Contrato","is_kuna":false},{"agente":"Franciso Ramirez Gonzalez","stock_id":"488183","metodo_pago":"Pago de Contado","fa_id":"FA","stage":"Firma de Contrato","is_kuna":false},{"agente":"Gaby S\u00e1nchez","stock_id":"478010","metodo_pago":"Financiamiento","fa_id":"FA219780","stage":"Entrega","is_kuna":true},{"agente":"Oscar Longines","stock_id":"490451","metodo_pago":"Financiamiento","fa_id":"FA221586","stage":"Entrega","is_kuna":true},{"agente":"Oscar Longines","stock_id":"484258","metodo_pago":"Pago de Contado","fa_id":"FA221115","stage":"Entrega","is_kuna":true},{"agente":"Franciso Ramirez Gonzalez","stock_id":"494744","metodo_pago":"Financiamiento","fa_id":"FA221472","stage":"Entrega","is_kuna":true},{"agente":"Paola Hernandez","stock_id":"495671","metodo_pago":"Financiamiento","fa_id":"FA222086","stage":"Entrega","is_kuna":true},{"agente":"Brandon Jarquin","stock_id":"500310","metodo_pago":"Financiamiento","fa_id":"FA221352","stage":"Entrega","is_kuna":true}];
+
+// ── TEAM GOALS ──
+const TEAM_GOALS = {
+  reservas: 240,
+  str:      70,
+  kuna:     58,
+  cash:     80,
+  fin:      66
+};
+
+function applyMetas(){
+  TEAM_GOALS.reservas = parseInt(g('m-reservas').value)||240;
+  TEAM_GOALS.str      = parseInt(g('m-str').value)||70;
+  TEAM_GOALS.kuna     = parseInt(g('m-kuna').value)||58;
+  TEAM_GOALS.cash     = parseInt(g('m-cash').value)||80;
+  TEAM_GOALS.fin      = parseInt(g('m-fin').value)||66;
+  META_STR  = TEAM_GOALS.str;
+  META_KSTR = TEAM_GOALS.kuna;
+  Object.keys(METAS).forEach(k=>{
+    const el=g('ma-'+k); if(el) METAS[k]=parseInt(el.value)||METAS[k];
+  });
+
+  // Update all hardcoded labels in the UI
+  const upd = (id, val) => { const el=g(id); if(el) el.textContent=val; };
+  upd('lbl-res-meta',   TEAM_GOALS.reservas);
+  upd('lbl-str-meta',   TEAM_GOALS.str);
+  upd('lbl-kuna-meta',  TEAM_GOALS.kuna);
+  upd('lbl-cash-meta',  TEAM_GOALS.cash);
+  upd('lbl-fin-meta',   TEAM_GOALS.fin);
+  upd('lbl-gauge-str',  TEAM_GOALS.str);
+  upd('lbl-gauge-str2', TEAM_GOALS.str);
+  upd('lbl-gauge-kuna', TEAM_GOALS.kuna);
+  upd('lbl-gauge-cash', TEAM_GOALS.cash);
+  upd('lbl-gauge-fin',  TEAM_GOALS.fin);
+  upd('lbl-kpi-str',    TEAM_GOALS.str);
+
+  if(window._lastData) render(window._lastData);
+  // Guardar metas en localStorage
+  try { localStorage.setItem('kavak_metas', JSON.stringify({team: TEAM_GOALS, individual: METAS})); } catch(e){}
+  document.querySelector('.meta-panel').classList.remove('open');
+}
+
+function badge(val, meta){
+  if(val >= meta) return '<span class="goal-gap-ok">✓ META</span>';
+  const gap = meta - val;
+  const pct_to_meta = Math.round(val/meta*100);
+  if(pct_to_meta >= 85) return `<span class="goal-gap-warn">Cerca</span>`;
+  return `<span class="goal-gap-bad">-${gap}</span>`;
+}
+
+function fillPct(val, meta){
+  return Math.min(Math.round(val/meta*100), 100);
+}
+
+function gapText(val, meta, unit=''){
+  if(val >= meta) return `<span class="goal-gap-ok">+${(val-meta).toFixed(unit?1:0)}${unit} ✓</span>`;
+  return `<span class="goal-gap-bad">Faltan ${(meta-val).toFixed(unit?1:0)}${unit}</span>`;
+}
+
+function renderGoals(s){
+  const G = TEAM_GOALS;
+
+  // Overall score: avg of 5 metrics % of goal
+  const scores = [
+    Math.min(s.tot / G.reservas * 100, 100),
+    Math.min(s.str / G.str * 100, 100),
+    Math.min(s.kstr / G.kuna * 100, 100),
+    Math.min(s.cstr / G.cash * 100, 100),
+    Math.min(s.fstr / G.fin * 100, 100),
+  ];
+  const overall = Math.round(scores.reduce((a,b)=>a+b,0) / scores.length);
+  const oel = g('g-overall-pct');
+  if(oel){ oel.textContent = overall+'%'; oel.style.color = overall>=100?'var(--green)':overall>=75?'var(--yellow)':'var(--accent)'; }
+
+  // RESERVAS
+  const resFill = fillPct(s.tot, G.reservas);
+  setGoal('res', s.tot, G.reservas, resFill, badge(s.tot, G.reservas), gapText(s.tot, G.reservas, ''), resFill+'%');
+
+  // STR TOTAL
+  const strFill = fillPct(s.str, G.str);
+  setGoal('str', s.str+'%', G.str+'%', strFill, badge(s.str, G.str), gapText(s.str, G.str, 'pp'), strFill+'%');
+
+  // KUNA %
+  const kunaFill = fillPct(s.kstr, G.kuna);
+  setGoal('kuna', s.kstr+'%', G.kuna+'%', kunaFill, badge(s.kstr, G.kuna), gapText(s.kstr, G.kuna, 'pp'), kunaFill+'%');
+
+  // CASH STR %
+  const cashFill = fillPct(s.cstr, G.cash);
+  setGoal('cash', s.cstr+'%', G.cash+'%', cashFill, badge(s.cstr, G.cash), gapText(s.cstr, G.cash, 'pp'), cashFill+'%');
+
+  // FIN STR %
+  const finFill = fillPct(s.fstr, G.fin);
+  setGoal('fin', s.fstr+'%', G.fin+'%', finFill, badge(s.fstr, G.fin), gapText(s.fstr, G.fin, 'pp'), finFill+'%');
+}
+
+function setGoal(key, actual, target, fillPct, badgeHtml, gapHtml, pctLabel){
+  const act = g('g-'+key+'-actual'); if(act) act.textContent = actual;
+  const fill = g('g-'+key+'-fill2'); if(fill) setTimeout(()=>{ fill.style.width = fillPct+'%' }, 120);
+  const badge_el = g('g-'+key+'-badge'); if(badge_el) badge_el.innerHTML = badgeHtml;
+  const gap_el = g('g-'+key+'-gap'); if(gap_el) gap_el.innerHTML = gapHtml;
+  const pct_el = g('g-'+key+'-pct2'); if(pct_el) pct_el.innerHTML = '<span style="color:#8ba8d4">'+pctLabel+' de meta</span>';
+}
+
+const METAS={'Oscar Longines':37,'Gaby Sánchez':37,'Franciso Ramirez Gonzalez':37,'Brandon Jarquin':37,'Paola Hernandez':37,'YAHIR LUIZ':18,'Samuel Rodriguez':18,'Mario Alberto Contreras':15,'Mirza Guevara':15};
+const DISP={'Oscar Longines':'Oscar','Gaby Sánchez':'Gabriela','Franciso Ramirez Gonzalez':'Francisco','Brandon Jarquin':'Brandon','Paola Hernandez':'Paola','YAHIR LUIZ':'Yahir','Samuel Rodriguez':'Samuel','Mario Alberto Contreras':'Mario','Mirza Guevara':'Mirza','Ivan Covarrubias':'Ivan','Jose Luis Ventura':'Jose Luis','Aremi Emer':'Aremi'};
+const CORE=['Oscar Longines','Gaby Sánchez','Franciso Ramirez Gonzalez','Brandon Jarquin','Paola Hernandez','YAHIR LUIZ','Samuel Rodriguez','Mario Alberto Contreras','Mirza Guevara'];
+let META_STR=70, META_KSTR=58;
+
+function isCash(r){
+  return (r.metodo_pago||'').toLowerCase().includes('contado');
+}
+function isFin(r){
+  return (r.metodo_pago||'').toLowerCase().includes('financiamiento');
+}
+function isKuna(r){
+  if(typeof r.is_kuna==='boolean') return r.is_kuna;
+  const f=String(r.fa_id||r.FA||'');
+  return f.length>2&&f.startsWith('FA')&&/\d/.test(f);
+}
+function pct(a,b){return b?Math.round(a/b*100):0}
+function g(id){return document.getElementById(id)}
+
+function compute(data){
+  const ag={}, sc={};
+  data.forEach(r=>{
+    const a=r.agente; if(!a) return;
+    if(!ag[a]) ag[a]={tot:0,won:0,lost:0,kuna:0,kw:0,kl:0,cash:0,cashw:0,cashl:0,fin:0,finw:0,finl:0,pipe:0};
+    const s=r.stage; sc[s]=(sc[s]||0)+1;
+    ag[a].tot++;
+    if(s==='Cerrada Ganada') ag[a].won++;
+    else if(s==='Cerrada Perdida') ag[a].lost++;
+    else ag[a].pipe++;
+    if(isKuna(r)){
+      ag[a].kuna++;
+      if(s==='Cerrada Ganada') ag[a].kw++;
+      if(s==='Cerrada Perdida') ag[a].kl++;
+    }
+    if(isCash(r)){
+      ag[a].cash++;
+      if(s==='Cerrada Ganada') ag[a].cashw++;
+      if(s==='Cerrada Perdida') ag[a].cashl++;
+    }
+    if(isFin(r)){
+      ag[a].fin++;
+      if(s==='Cerrada Ganada') ag[a].finw++;
+      if(s==='Cerrada Perdida') ag[a].finl++;
+    }
+  });
+  let tot=0,won=0,lost=0,kuna=0,kw=0,kl=0,cash=0,cashw=0,cashl=0,fin=0,finw=0,finl=0;
+  Object.values(ag).forEach(a=>{tot+=a.tot;won+=a.won;lost+=a.lost;kuna+=a.kuna;kw+=a.kw;kl+=a.kl;cash+=a.cash;cashw+=a.cashw;cashl+=a.cashl;fin+=a.fin;finw+=a.finw;finl+=a.finl});
+  const cerr=won+lost, ccerr=cashw+cashl;
+  // STR Total = ganadas / (ganadas+perdidas)
+  // STR KUNA  = ganadas KUNA / total ganadas
+  // STR Cash  = ganadas Cash / (ganadas Cash + perdidas Cash)
+  const fcerr=finw+finl;
+  return{ag,sc,tot,won,lost,kuna,kw,kl,cash,cashw,cashl,fin,finw,finl,
+    str:pct(won,cerr), kstr:pct(kw,won), cstr:pct(cashw,ccerr), fstr:pct(finw,fcerr),
+    cerr, ccerr, fcerr};
+}
+
+function render(data){
+  window._lastData = data;
+  // Guardar automáticamente en localStorage
+  try { localStorage.setItem('kavak_data', JSON.stringify(data)); } catch(e){}
+  const s=compute(data);
+
+  g('k-total').textContent=s.tot;
+  g('k-total-n').textContent=`${s.won} ganadas · ${s.lost} perdidas`;
+
+  g('k-kw').textContent=s.kw;
+  g('k-kw-n').textContent=`${s.won?pct(s.kw,s.won):0}% de las ganadas totales`;
+
+  g('k-cashw').textContent=s.cashw;
+  g('k-cashw-n').textContent=`de ${s.ccerr} contado cerradas`;
+
+  g('k-lost').textContent=s.lost;
+  g('k-lost-n').textContent=`de ${s.cerr} cerradas totales`;
+
+  g('k-kuna').textContent=s.kuna;
+  g('k-kuna-n').textContent=`${s.kw} ganadas · ${s.kl} perdidas`;
+
+  const strC=s.str>=TEAM_GOALS.str?'tok':s.str>=TEAM_GOALS.str*0.85?'twarn':'tbad';
+  g('k-str').textContent=s.str+'%'; g('k-str').className='kpi-num '+strC;
+  g('k-str-n').innerHTML=`<span class="${strC}">${s.str>=TEAM_GOALS.str?'✓ Sobre meta':'Faltan '+(TEAM_GOALS.str-s.str)+'pp'}</span>`;
+
+  const ksC=s.kstr>=TEAM_GOALS.kuna?'tok':s.kstr>=TEAM_GOALS.kuna*0.85?'twarn':'tbad';
+  g('k-kstr').textContent=s.kstr+'%'; g('k-kstr').className='kpi-num '+ksC;
+  g('k-kstr-n').innerHTML=`<span class="${ksC}">${s.kw} KUNA de ${s.won} ganadas</span>`;
+
+  const csC=s.cstr>=TEAM_GOALS.cash?'tok':s.cstr>=TEAM_GOALS.cash*0.85?'twarn':'tbad';
+  g('k-cstr').textContent=s.cstr+'%'; g('k-cstr').className='kpi-num '+csC;
+  g('k-cstr-n').innerHTML=`<span class="${csC}">${s.cashw} gan · ${s.cashl} perd contado</span>`;
+
+  gauge('g-str', s.str,  TEAM_GOALS.str);
+  gauge('g-kuna', s.kstr, TEAM_GOALS.kuna);
+  gauge('g-cash', s.cstr, TEAM_GOALS.cash);
+  g('g-str-gap').innerHTML=s.str>=TEAM_GOALS.str?`<span class="tok">+${s.str-TEAM_GOALS.str}pp ✓</span>`:`<span class="tbad">-${TEAM_GOALS.str-s.str}pp</span>`;
+  g('g-kuna-gap').innerHTML=s.kstr>=TEAM_GOALS.kuna?`<span class="tok">+${s.kstr-TEAM_GOALS.kuna}pp ✓</span>`:`<span class="tbad">-${TEAM_GOALS.kuna-s.kstr}pp Faltan</span>`;
+  g('g-cash-gap').innerHTML=s.cstr>=TEAM_GOALS.cash?`<span class="tok">+${s.cstr-TEAM_GOALS.cash}pp ✓</span>`:`<span class="tbad">-${TEAM_GOALS.cash-s.cstr}pp</span>`;
+
+  const fC=s.fstr>=TEAM_GOALS.fin?'tok':s.fstr>=TEAM_GOALS.fin*0.85?'twarn':'tbad';
+  g('k-fstr').textContent=s.fstr+'%'; g('k-fstr').className='kpi-num '+fC;
+  g('k-fstr-n').innerHTML=`<span class="${fC}">${s.fstr>=TEAM_GOALS.fin?'✓ Sobre meta':'Faltan '+(TEAM_GOALS.fin-s.fstr)+'pp'}</span>`;
+  g('k-finw').textContent=s.finw;
+  g('k-finw-n').textContent=`de ${s.fcerr} fin. cerradas`;
+  g('k-finl').textContent=s.finl;
+  g('k-finl-n').textContent=`${s.fcerr} fin. cerradas total`;
+  gauge('g-fin', s.fstr, TEAM_GOALS.fin);
+  g('g-fin-gap').innerHTML=s.fstr>=TEAM_GOALS.fin?`<span class="tok">+${s.fstr-TEAM_GOALS.fin}pp ✓</span>`:`<span class="tbad">-${TEAM_GOALS.fin-s.fstr}pp</span>`;
+
+  renderStages(s.sc,s.tot);
+
+  const list=CORE.filter(a=>s.ag[a]);
+  list.sort((a,b)=>(s.ag[b].tot/(METAS[b]||37))-(s.ag[a].tot/(METAS[a]||37)));
+  const tier={};
+  list.forEach((a,i)=>{tier[a]=i<3?'top':i>=list.length-3?'low':'mid'});
+
+  renderTable(list,s.ag,tier);
+  renderActions(list,s.ag,tier);
+  renderGoals(s);
+}
+
+function gauge(id,val,meta){
+  const fill=Math.min(val/100*251,251);
+  setTimeout(()=>{ g(id+'-fill')&&g(id+'-fill').setAttribute('stroke-dasharray',`${fill} 251`) },80);
+  const col=val>=meta?'var(--green)':val>=meta-8?'var(--yellow)':'var(--red)';
+  if(g(id+'-fill')) g(id+'-fill').setAttribute('stroke',col);
+  if(g(id+'-val')){ g(id+'-val').textContent=val+'%'; g(id+'-val').setAttribute('fill',col); }
+}
+
+function renderStages(sc,tot){
+  const ORDER=[{k:'Cerrada Ganada',c:'var(--green)'},{k:'Facturación',c:'var(--accent)'},{k:'Entrega',c:'var(--blue)'},{k:'Firma de Contrato',c:'var(--purple)'},{k:'Pago',c:'var(--yellow)'},{k:'Hand Off - Dictamen',c:'#6b6b88'},{k:'Cerrada Perdida',c:'var(--red)'}];
+  const el=g('stages-card'); el.innerHTML='';
+  ORDER.forEach(({k,c})=>{
+    const n=sc[k]||0; if(!n) return;
+    el.innerHTML+=`<div class="stage-row"><div class="stage-name">${k}</div><div class="stage-bar-wrap"><div class="stage-bar" style="width:${pct(n,tot)}%;background:${c}"></div></div><div class="stage-count">${n}</div></div>`;
+  });
+}
+
+function renderTable(list,ag,tier){
+  const tb=g('perf-body'); tb.innerHTML='';
+  list.forEach(a=>{
+    const d=ag[a],meta=METAS[a]||37,avance=Math.min(pct(d.tot,meta),100),faltan=Math.max(meta-d.tot,0);
+    const cerr=d.won+d.lost, str=pct(d.won,cerr);
+    // STR KUNA = ganadas KUNA / total ganadas; % Ganadas Cash = ganadas Cash / total ganadas
+    const kstr=d.won?pct(d.kw,d.won):null;
+    const ccerr=d.cashw+d.cashl;
+    const cstr=ccerr?pct(d.cashw,ccerr):null;
+    const dfcerr=d.finw+d.finl;
+    const fstr=dfcerr?pct(d.finw,dfcerr):null;
+    const t=tier[a],bc=t==='top'?'var(--accent)':t==='low'?'var(--red)':'var(--yellow)';
+    const tBadge=t==='top'?'<span class="tier tier-top">⭐ TOP</span>':t==='low'?'<span class="tier tier-low">⚠ LOW</span>':'<span class="tier tier-mid">⬤ MID</span>';
+    const strC  = cerr  ? (str  >= TEAM_GOALS.str  ? 'tok' : str  >= TEAM_GOALS.str  * 0.85 ? 'twarn' : 'tbad') : '';
+    const kstrC = kstr  !== null ? (kstr >= TEAM_GOALS.kuna ? 'tok' : kstr >= TEAM_GOALS.kuna * 0.85 ? 'twarn' : 'tbad') : '';
+    const cstrC = cstr  !== null ? (cstr >= TEAM_GOALS.cash ? 'tok' : cstr >= TEAM_GOALS.cash * 0.85 ? 'twarn' : 'tbad') : '';
+    const fstrC = fstr  !== null ? (fstr >= TEAM_GOALS.fin  ? 'tok' : fstr >= TEAM_GOALS.fin  * 0.85 ? 'twarn' : 'tbad') : '';
+    tb.innerHTML+=`<tr>
+      <td><div class="agent-cell">${tBadge} ${DISP[a]||a}</div></td>
+      <td class="mono">${d.tot}</td><td class="mono">${meta}</td>
+      <td><div style="font-family:'Space Mono',monospace;font-size:.8rem;margin-bottom:4px;color:${avance>=100?'var(--green)':avance>=70?'var(--yellow)':'var(--red)'}">${avance}%</div><div class="pbar-wrap"><div class="pbar" style="width:${avance}%;background:${bc}"></div></div></td>
+      <td class="mono" style="color:${faltan===0?'var(--green)':'var(--red)'}">${faltan===0?'✓':faltan}</td>
+      <td class="mono">${d.kuna}</td>
+      <td class="mono tok">${d.kw}</td>
+      <td class="mono" style="color:var(--blue)">${d.cashw}</td>
+      <td class="mono tbad">${d.lost}</td>
+      <td class="mono ${strC}">${cerr?str+'%':'—'}</td>
+      <td class="mono ${kstrC}">${kstr!==null?kstr+'%':'—'}</td>
+      <td class="mono ${cstrC}">${cstr!==null?cstr+'%':'—'}</td>
+      <td class="mono ${fstrC}">${fstr!==null?fstr+'%':'—'}</td>
+      <td>${tBadge}</td>
+    </tr>`;
+  });
+}
+
+// ── AI FEEDBACK ──
+let AI_PLAN = {}; // will be populated by AI or kept empty for skeleton
+
+function renderActions(list, ag, tier){
+  const grid = g('actions-grid');
+  grid.innerHTML = '';
+  list.forEach(a => {
+    const d = ag[a], meta = METAS[a]||37, faltan = Math.max(meta - d.tot, 0);
+    const t = tier[a];
+    const cerr = d.won + d.lost, str = cerr ? pct(d.won, cerr) : 0;
+    const tBadge = t==='top'
+      ? '<span class="tier tier-top">⭐ TOP PERFORMER</span>'
+      : t==='low'
+        ? '<span class="tier tier-low">⚠ NECESITA APOYO</span>'
+        : '<span class="tier tier-mid">⬤ EN TRACK</span>';
+    const cc = t==='top' ? 'act-card top-tier' : t==='low' ? 'act-card low-tier' : 'act-card';
+    const plan = AI_PLAN[a];
+    let items;
+    if(plan && plan.length){
+      items = plan.map(i => `<li class="${i.c||''}"><span class="ico">→</span>${i.t}</li>`).join('');
+    } else {
+      items = `<li style="color:var(--muted);font-style:italic"><span class="ico" style="color:var(--muted)">→</span>Presiona "Actualizar Feedback con IA" para generar análisis.</li>`;
+    }
+    grid.innerHTML += `<div class="${cc}">
+      <div class="act-agent">${tBadge} ${DISP[a]||a}</div>
+      <div class="act-status">${d.tot} reservas · Meta ${meta} · Faltan ${faltan} · STR ${cerr?str+'%':'—'}</div>
+      <ul class="act-list">${items}</ul>
+    </div>`;
+  });
+}
+
+async function generarFeedback(){
+  if(!window._lastData){ alert('Primero carga un archivo Excel.'); return; }
+  const btn = g('feedbackBtn');
+  const status = g('feedback-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generando...';
+  status.textContent = '⏳ Analizando datos...';
+  status.style.color = 'var(--accent)';
+
+  const s = compute(window._lastData);
+  const list = CORE.filter(a => s.ag[a]);
+  list.sort((a,b) => (s.ag[b].tot/(METAS[b]||37)) - (s.ag[a].tot/(METAS[a]||37)));
+  const tier = {};
+  list.forEach((a,i) => { tier[a] = i<3?'top': i>=list.length-3?'low':'mid'; });
+
+  // ── MOTOR DE FEEDBACK LOCAL ──
+  const plan = {};
+  list.forEach(a => {
+    const d = s.ag[a];
+    const meta = METAS[a]||37;
+    const faltan = Math.max(meta - d.tot, 0);
+    const cerr = d.won + d.lost;
+    const str = cerr ? Math.round(d.won/cerr*100) : null;
+    const kstr = d.won ? Math.round(d.kw/d.won*100) : null;
+    const ccerr = d.cashw + d.cashl;
+    const cstr = ccerr ? Math.round(d.cashw/ccerr*100) : null;
+    const fcerr = d.finw + d.finl;
+    const fstr = fcerr ? Math.round(d.finw/fcerr*100) : null;
+    const avance = Math.round(d.tot/meta*100);
+    const nombre = DISP[a]||a;
+    const items = [];
+
+    // 1. Resumen de posición
+    if(avance >= 90)      items.push({t:`${nombre} está al ${avance}% de su meta (${d.tot}/${meta}). Excelente ritmo — asegurar los últimos ${faltan} cierres.`});
+    else if(avance >= 60) items.push({t:`${nombre} lleva ${d.tot} reservas de ${meta} (${avance}%). Ritmo estable, necesita ${faltan} más para cerrar el mes.`});
+    else if(avance >= 35) items.push({c:'warn', t:`${nombre} va al ${avance}% de meta. Con ${faltan} reservas pendientes se requiere acelerar el ritmo esta semana.`});
+    else                  items.push({c:'danger', t:`${nombre} tiene solo ${d.tot}/${meta} reservas (${avance}%). Situación crítica — necesita intervención inmediata del líder.`});
+
+    // 2. Pipeline activo
+    const pipe = d.pipe;
+    if(pipe > 0){
+      // Count by stage from raw data
+      const rawPipe = (window._lastData||[]).filter(r=>r.agente===a && !['Cerrada Ganada','Cerrada Perdida'].includes(r.stage));
+      const facturacion = rawPipe.filter(r=>r.stage==='Facturación').length;
+      const entrega = rawPipe.filter(r=>r.stage==='Entrega').length;
+      const handoff = rawPipe.filter(r=>r.stage==='Hand Off - Dictamen').length;
+      const firma = rawPipe.filter(r=>r.stage==='Firma de Contrato').length;
+      const conFA = rawPipe.filter(r=>r.is_kuna).length;
+      if(facturacion > 0 || entrega > 0){
+        items.push({t:`Pipeline de cierre inminente: ${facturacion>0?facturacion+' en Facturación':''}${facturacion>0&&entrega>0?', ':''}${entrega>0?entrega+' en Entrega':''} — prioridad máxima esta semana${conFA>0?` (${conFA} con FA activo)`:'.'}`});
+      }
+      if(handoff > 0){
+        const hFA = rawPipe.filter(r=>r.stage==='Hand Off - Dictamen'&&r.is_kuna).length;
+        items.push({c: hFA>0?'':'warn', t:`${handoff} en Hand Off - Dictamen${hFA>0?` (${hFA} con FA#)`:''}. Dar seguimiento diario a dictamen para no perder estas oportunidades.`});
+      }
+      if(firma > 0) items.push({t:`${firma} en Firma de Contrato — coordinar para avanzar a Facturación esta semana.`});
+    }
+
+    // 3. STR
+    if(str !== null){
+      if(str >= TEAM_GOALS.str)       items.push({t:`STR ${str}% ✓ — por encima de meta (${TEAM_GOALS.str}%). Buen manejo de cierre.`});
+      else if(str >= TEAM_GOALS.str-10) items.push({c:'warn', t:`STR ${str}% — cerca de meta (${TEAM_GOALS.str}%). Revisar objeciones frecuentes en últimas ${d.lost} perdidas.`});
+      else                              items.push({c:'danger', t:`STR ${str}% — muy por debajo de meta (${TEAM_GOALS.str}%). De ${cerr} cerradas solo ${d.won} ganadas. Coaching urgente en proceso de cierre.`});
+    } else if(d.tot > 0){
+      items.push({c:'warn', t:`Sin reservas cerradas aún. Toda la cartera está en pipeline — urge mover a cierre.`});
+    }
+
+    // 4. KUNA / Financiamiento
+    if(d.kuna > 0){
+      if(kstr !== null && kstr < 60) items.push({c:'warn', t:`Conversión KUNA: ${d.kw} ganadas de ${d.kuna} reservas KUNA (${kstr}%). Mejorar seguimiento con asesores de crédito para subir este índice.`});
+      else if(kstr !== null)          items.push({t:`Buen perfil KUNA: ${d.kw} de ${d.kuna} reservas con FA convertidas (${kstr}%).`});
+    }
+    if(fstr !== null && fstr < TEAM_GOALS.fin) items.push({c:'warn', t:`STR Financiamiento ${fstr}% (meta ${TEAM_GOALS.fin}%). ${d.finl} perdidas en financiamiento — revisar presentación de opciones de crédito.`});
+
+    // 5. Ritmo requerido
+    const diasRestantes = 9; // approx working days left
+    if(faltan > 0){
+      const ritmo = (faltan/diasRestantes).toFixed(1);
+      if(parseFloat(ritmo) >= 3)       items.push({c:'danger', t:`Necesita ${ritmo} reservas/día en los ~${diasRestantes} días restantes. Plan de acción urgente con el gerente.`});
+      else if(parseFloat(ritmo) >= 1.5) items.push({c:'warn', t:`Debe lograr ~${ritmo} reservas/día para alcanzar meta. Prospección activa: referidos, digital y seguimiento de base.`});
+      else if(parseFloat(ritmo) > 0)    items.push({t:`Ritmo requerido: ~${ritmo} reservas/día — alcanzable si mantiene actividad constante.`});
+    }
+
+    plan[a] = items.slice(0,5);
+  });
+
+  AI_PLAN = plan;
+  // Guardar feedback en localStorage
+  try { localStorage.setItem('kavak_feedback', JSON.stringify(plan)); } catch(e){}
+  renderActions(list, s.ag, tier);
+  status.textContent = `✓ Feedback actualizado · ${new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}`;
+  status.style.color = 'var(--green)';
+  btn.disabled = false;
+  btn.textContent = '✦ Actualizar Feedback con IA';
+}
+
+
+// ── EXCEL UPLOAD HANDLER ──
+// This parser handles the Kavak ETAPAS export format:
+// - Header row at row 11 (index 10), data starts at row 12
+// - Stage column is filled only on the first row of each group → needs forward-fill
+// - Subtotal/Total rows must be skipped
+
+const VALID_STAGES = new Set(['Hand Off - Dictamen','Cerrada Ganada','Cerrada Perdida','Facturación','Firma de Contrato','Entrega','Pago']);
+
+function parseKavakExcel(wb){
+  const sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  // Get all rows as arrays (no header parsing yet)
+  const allRows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+  // Find header row: first row that contains 'Stage' or 'Opportunity'
+  let headerIdx = -1;
+  for(let i=0;i<allRows.length;i++){
+    const rowStr = allRows[i].join('|');
+    if(rowStr.includes('Stage') || rowStr.includes('Hub Agent')){
+      headerIdx = i; break;
+    }
+  }
+  if(headerIdx < 0) throw new Error('No se encontró la fila de encabezados. ¿Es el reporte de ETAPAS correcto?');
+
+  const headers = allRows[headerIdx];
+  // Find column indices
+  const findCol = (...keys) => {
+    for(const k of keys){
+      const idx = headers.findIndex(h=>String(h).includes(k));
+      if(idx>=0) return idx;
+    }
+    return -1;
+  };
+  const iStage   = findCol('Stage');
+  const iAgent   = findCol('Hub Agent');
+  const iStock   = findCol('StockId','Stock');
+  const iMetodo  = findCol('Método de pago','metodo_pago','Metodo');
+  const iFA      = findCol('ID de FA','fa_id','FA');
+
+  if(iAgent < 0) throw new Error('No se encontró columna de agente ("Hub Agent Achieved reservation"). ¿Exportaste el reporte correcto?');
+
+  const dataRows = allRows.slice(headerIdx+1);
+  let lastStage = '';
+  const parsed = [];
+
+  for(const row of dataRows){
+    // Forward-fill stage
+    const rawStage = String(row[iStage]||'').trim();
+    if(rawStage && rawStage !== 'nan') lastStage = rawStage;
+
+    const agente = String(row[iAgent]||'').trim();
+    if(!agente || agente === 'nan') continue;
+
+    const stage = lastStage;
+    if(!VALID_STAGES.has(stage)) continue; // skip Subtotal/Total rows
+
+    const stock_id  = String(row[iStock]||'').trim();
+    const metodo_pago = String(row[iMetodo]||'').trim();
+    const fa_id     = String(row[iFA]||'').trim();
+    const is_kuna   = fa_id.startsWith('FA') && fa_id.length > 2 && /\d/.test(fa_id);
+
+    parsed.push({agente, stock_id, metodo_pago, fa_id, stage, is_kuna});
+  }
+  if(!parsed.length) throw new Error('El archivo se leyó pero no se encontraron registros válidos.');
+  return {parsed, sheetName};
+}
+
+document.getElementById('xlsxInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const m = g('parseMsg');
+  m.textContent = '⏳ Leyendo archivo...'; m.className = '';
+
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      if(typeof XLSX === 'undefined') throw new Error('Librería de Excel no cargada. Verifica tu conexión a internet e intenta de nuevo.');
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const {parsed, sheetName} = parseKavakExcel(wb);
+      render(parsed);
+      const fechaStr = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+      try { localStorage.setItem('kavak_fecha', fechaStr); } catch(e){}
+      m.innerHTML = `✓ ${parsed.length} registros · ${fechaStr} · <span id="reloadLink" style="cursor:pointer;text-decoration:underline;color:var(--accent)" onclick="document.getElementById('xlsxBtn').style.display='flex';document.getElementById('xlsxInput').click()">cargar nuevo archivo</span>`; m.className = 'ok';
+      document.getElementById('xlsxBtn').style.display='none';
+      e.target.value = '';
+    }catch(err){
+      m.textContent = '✗ Error: '+err.message; m.className = 'err';
+    }
+  };
+  reader.onerror = ()=>{ m.textContent='✗ No se pudo leer el archivo'; m.className='err'; };
+  reader.readAsArrayBuffer(file);
+});
+
+
+
+// ── HISTORIAL DE CIERRES ──
+function guardarMes(){
+  if(!window._lastData){ alert('Primero carga un archivo Excel.'); return; }
+  const s = compute(window._lastData);
+  const list = CORE.filter(a => s.ag[a]);
+
+  // Pedir nombre del mes
+  const mesNombre = prompt('¿Cómo quieres nombrar este cierre? (ej: Abril 2026)', new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'}));
+  if(!mesNombre) return;
+
+  const snapshot = {
+    id: Date.now(),
+    mes: mesNombre,
+    fecha: new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
+    team: {
+      reservas: s.tot, metaReservas: TEAM_GOALS.reservas,
+      ganadas: s.won, perdidas: s.lost,
+      str: s.str,   metaStr:  TEAM_GOALS.str,
+      kstr: s.kstr, metaKuna: TEAM_GOALS.kuna,
+      cstr: s.cstr, metaCash: TEAM_GOALS.cash,
+      fstr: s.fstr, metaFin:  TEAM_GOALS.fin,
+    },
+    asesores: list.map(a => {
+      const d = s.ag[a];
+      const meta = METAS[a]||37;
+      const cerr  = d.won+d.lost;
+      const ccerr = d.cashw+d.cashl;
+      const fcerr = d.finw+d.finl;
+      const str     = cerr  ? Math.round(d.won/cerr*100)    : null;
+      const kstr    = d.won ? Math.round(d.kw/d.won*100)    : null;
+      const cashStr = ccerr ? Math.round(d.cashw/ccerr*100) : null;
+      const finStr  = fcerr ? Math.round(d.finw/fcerr*100)  : null;
+      return {
+        nombre: DISP[a]||a,
+        reservas: d.tot, meta,
+        ganadas: d.won, perdidas: d.lost,
+        str, kstr, cashStr, finStr,
+        kuna: d.kuna, pipeline: d.pipe,
+        cashw: d.cashw, finw: d.finw
+      };
+    })
+  };
+
+  try {
+    const hist = JSON.parse(localStorage.getItem('kavak_historial')||'[]');
+    hist.unshift(snapshot);
+    localStorage.setItem('kavak_historial', JSON.stringify(hist));
+    renderHistorial();
+    const st = g('hist-status');
+    st.textContent = `✓ Cierre "${mesNombre}" guardado correctamente`;
+    st.style.color = 'var(--green)';
+    setTimeout(()=>{ st.textContent=''; }, 4000);
+  } catch(e) {
+    alert('Error al guardar: ' + e.message);
+  }
+}
+
+function colorClass(val, meta){
+  if(val === null || val === undefined) return '';
+  if(val >= meta) return 'hist-ok';
+  if(val >= meta * 0.8) return 'hist-warn';
+  return 'hist-bad';
+}
+
+function renderHistorial(){
+  const cont = g('historial-container');
+  try {
+    const hist = JSON.parse(localStorage.getItem('kavak_historial')||'[]');
+    if(!hist.length){
+      cont.innerHTML = '<div class="hist-empty">Aún no hay cierres guardados. Carga un Excel y presiona 💾 Guardar Mes al final del mes.</div>';
+      return;
+    }
+    cont.innerHTML = hist.map(h => {
+      const t = h.team;
+      const strC  = colorClass(t.str,  t.metaStr);
+      const ksC   = colorClass(t.kstr, t.metaKuna);
+      const csC   = colorClass(t.cstr, t.metaCash);
+      const fsC   = colorClass(t.fstr, t.metaFin);
+      const resC  = colorClass(Math.round(t.reservas/t.metaReservas*100), 80);
+
+      // Rank asesores by avance % to assign tier colors
+      const ranked = [...h.asesores].sort((a,b) => (b.reservas/b.meta) - (a.reservas/a.meta));
+      const n = ranked.length;
+      const tierMap = {};
+      ranked.forEach((a, i) => {
+        if(i < Math.ceil(n/3))           tierMap[a.nombre] = 'top';
+        else if(i < Math.ceil(2*n/3))    tierMap[a.nombre] = 'mid';
+        else                              tierMap[a.nombre] = 'low';
+      });
+      // Bottom 4 always low regardless
+      ranked.slice(-4).forEach(a => tierMap[a.nombre] = 'low');
+
+      const tierRowStyle = { top: 'rgba(0,220,130,0.05)', mid: 'rgba(255,204,0,0.04)', low: 'rgba(255,60,60,0.07)' };
+      const tierNameColor = { top: 'var(--green)', mid: 'var(--yellow)', low: 'var(--red)' };
+      const tierBadge = {
+        top: '<span style="background:rgba(0,220,130,0.15);color:var(--green);border-radius:4px;padding:1px 6px;font-size:0.6rem;font-weight:800;margin-right:6px">⭐ TOP</span>',
+        mid: '<span style="background:rgba(255,204,0,0.12);color:var(--yellow);border-radius:4px;padding:1px 6px;font-size:0.6rem;font-weight:800;margin-right:6px">● MID</span>',
+        low: '<span style="background:rgba(255,60,60,0.15);color:var(--red);border-radius:4px;padding:1px 6px;font-size:0.6rem;font-weight:800;margin-right:6px">▲ LOW</span>',
+      };
+
+      const tierOrder = { top: 0, mid: 1, low: 2 };
+      const sortedAsesores = [...h.asesores].sort((a, b) => {
+        const ta = tierMap[a.nombre] || 'mid';
+        const tb = tierMap[b.nombre] || 'mid';
+        if(tierOrder[ta] !== tierOrder[tb]) return tierOrder[ta] - tierOrder[tb];
+        return (b.reservas/b.meta) - (a.reservas/a.meta); // within same tier, sort by avance
+      });
+
+      const filas = sortedAsesores.map(a => {
+        const avance = Math.round(a.reservas/a.meta*100);
+        const tier = tierMap[a.nombre];
+        const ac  = colorClass(avance, 80);
+        const sc  = colorClass(a.str,      t.metaStr);
+        const ksc = colorClass(a.kstr,     t.metaKuna);
+        const csc = colorClass(a.cashStr,  t.metaCash);
+        const fsc = colorClass(a.finStr,   t.metaFin);
+        const rowBg = tierRowStyle[tier];
+        const nameColor = tierNameColor[tier];
+        return `<tr style="background:${rowBg}">
+          <td style="font-weight:800;color:${nameColor}">${tierBadge[tier]}${a.nombre}</td>
+          <td>${a.reservas}<span style="color:var(--muted)">/${a.meta}</span></td>
+          <td class="hist-pct ${ac}" style="font-weight:800">${avance}%</td>
+          <td style="color:var(--green);font-weight:700">${a.ganadas}</td>
+          <td style="color:${a.perdidas>5?'var(--red)':a.perdidas>2?'var(--yellow)':'var(--text)'};font-weight:700">${a.perdidas}</td>
+          <td class="hist-pct ${sc}">${a.str !== null ? a.str+'%' : '—'}</td>
+          <td>${a.kuna}</td>
+          <td class="hist-pct ${ksc}">${a.kstr !== null ? a.kstr+'%' : '—'}</td>
+          <td class="hist-pct ${csc}">${a.cashStr !== null ? a.cashStr+'%' : '—'}</td>
+          <td class="hist-pct ${fsc}">${a.finStr !== null ? a.finStr+'%' : '—'}</td>
+          <td>${a.pipeline}</td>
+        </tr>`;
+      }).join('');
+
+      return `<div class="hist-mes">
+        <div class="hist-mes-header">
+          <div>
+            <div class="hist-mes-title">📅 ${h.mes}</div>
+            <div class="hist-mes-sub">Guardado el ${h.fecha}</div>
+          </div>
+          <button class="hist-del" onclick="eliminarMes(${h.id})">✕ Eliminar</button>
+        </div>
+        <div class="hist-team-bar">
+          <div class="hist-kpi"><div class="hist-kpi-val ${resC}">${t.reservas}<span style="font-size:.7rem;color:var(--muted)">/${t.metaReservas}</span></div><div class="hist-kpi-lbl">Reservas</div></div>
+          <div class="hist-kpi"><div class="hist-kpi-val ${strC}">${t.str}%</div><div class="hist-kpi-lbl">STR Total</div></div>
+          <div class="hist-kpi"><div class="hist-kpi-val ${ksC}">${t.kstr}%</div><div class="hist-kpi-lbl">KUNA STR</div></div>
+          <div class="hist-kpi"><div class="hist-kpi-val ${csC}">${t.cstr}%</div><div class="hist-kpi-lbl">Cash STR</div></div>
+          <div class="hist-kpi"><div class="hist-kpi-val ${fsC}">${t.fstr}%</div><div class="hist-kpi-lbl">Fin STR</div></div>
+          <div class="hist-kpi"><div class="hist-kpi-val" style="color:var(--accent)">${t.ganadas}</div><div class="hist-kpi-lbl">Ganadas</div></div>
+          <div class="hist-kpi"><div class="hist-kpi-val" style="color:var(--red)">${t.perdidas}</div><div class="hist-kpi-lbl">Perdidas</div></div>
+        </div>
+        <table class="hist-table">
+          <thead><tr>
+            <th>Asesor</th><th>Reservas</th><th>Avance</th><th>Ganadas</th><th>Perdidas</th>
+            <th>STR</th><th>KUNA</th><th>STR KUNA</th><th>STR Cash</th><th>STR Fin.</th><th>Pipeline</th>
+          </tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    cont.innerHTML = '<div class="hist-empty">Error cargando historial.</div>';
+  }
+}
+
+function eliminarMes(id){
+  if(!confirm('¿Eliminar este cierre del historial?')) return;
+  try {
+    const hist = JSON.parse(localStorage.getItem('kavak_historial')||'[]').filter(h=>h.id!==id);
+    localStorage.setItem('kavak_historial', JSON.stringify(hist));
+    renderHistorial();
+  } catch(e){}
+}
+
+function limpiarHistorial(){
+  if(!confirm('¿Limpiar TODO el historial? Esta acción no se puede deshacer.')) return;
+  localStorage.removeItem('kavak_historial');
+  renderHistorial();
+}
+
+// ── RESTAURAR ESTADO AL ABRIR ──
+(function(){
+  try {
+    // 1. Restaurar metas guardadas
+    const savedMetas = localStorage.getItem('kavak_metas');
+    if(savedMetas){
+      const m = JSON.parse(savedMetas);
+      if(m.team){
+        Object.assign(TEAM_GOALS, m.team);
+        META_STR  = TEAM_GOALS.str;
+        META_KSTR = TEAM_GOALS.kuna;
+        // Actualizar inputs del panel de metas
+        const si = (id,v) => { const el=g(id); if(el) el.value=v; };
+        si('m-reservas', TEAM_GOALS.reservas);
+        si('m-str',      TEAM_GOALS.str);
+        si('m-kuna',     TEAM_GOALS.kuna);
+        si('m-cash',     TEAM_GOALS.cash);
+        si('m-fin',      TEAM_GOALS.fin);
+      }
+      if(m.individual){
+        Object.assign(METAS, m.individual);
+        Object.keys(METAS).forEach(k=>{
+          const el=g('ma-'+k); if(el) el.value=METAS[k];
+        });
+      }
+      // Actualizar todos los labels de metas en el UI
+      const upd = (id,val) => { const el=g(id); if(el) el.textContent=val; };
+      upd('lbl-res-meta',   TEAM_GOALS.reservas);
+      upd('lbl-str-meta',   TEAM_GOALS.str);
+      upd('lbl-kuna-meta',  TEAM_GOALS.kuna);
+      upd('lbl-cash-meta',  TEAM_GOALS.cash);
+      upd('lbl-fin-meta',   TEAM_GOALS.fin);
+      upd('lbl-gauge-str',  TEAM_GOALS.str);
+      upd('lbl-gauge-str2', TEAM_GOALS.str);
+      upd('lbl-gauge-kuna', TEAM_GOALS.kuna);
+      upd('lbl-gauge-cash', TEAM_GOALS.cash);
+      upd('lbl-gauge-fin',  TEAM_GOALS.fin);
+      upd('lbl-kpi-str',    TEAM_GOALS.str);
+    }
+
+    // 2. Restaurar feedback guardado
+    const savedFeedback = localStorage.getItem('kavak_feedback');
+    if(savedFeedback) AI_PLAN = JSON.parse(savedFeedback);
+
+    // 3. Restaurar datos y renderizar
+    const savedData = localStorage.getItem('kavak_data');
+    if(savedData){
+      const data = JSON.parse(savedData);
+      window._lastData = data;
+      render(data);
+      // Mostrar mensaje de que hay datos guardados
+      const m = g('parseMsg');
+      const fecha = localStorage.getItem('kavak_fecha') || '';
+      m.innerHTML = `✓ Datos guardados${fecha?' · '+fecha:''} · <span style="cursor:pointer;text-decoration:underline;color:var(--accent)" onclick="document.getElementById('xlsxBtn').style.display='flex';document.getElementById('xlsxInput').click()">cargar nuevo archivo</span>`;
+      m.className = 'ok';
+      document.getElementById('xlsxBtn').style.display = 'none';
+    } else {
+      render(EMBEDDED);
+    }
+  } catch(e){
+    render(EMBEDDED);
+  }
+  renderHistorial();
+})();
+</script>
+</body>
+</html>
